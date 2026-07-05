@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+# 기밀 파일(거래처명·내부 코드체계) — 공개 금지
+secret_file/
+# 실데이터 산출물 — 절대 커밋 금지
+register.json
+register*.json
+# 정찰 덤프(실데이터)·엑셀·빌드물 제외
+ierp_inspect/
+*.xlsx
+dist/
+build/
+*.spec
+*.bak
+*.bak.js
