@@ -34,6 +34,7 @@ EXPORT_DIR = Path(r"C:\ierp_exports")
 # 정찰(inspect_ierp.py)로 확인된 화면별 식별자
 STOCK = dict(
     title_re=r".*재고현황조회.*",       # frmPM80160Rv1
+    program_id="PM80160Rv1",           # F9 실행창에 입력할 프로그램 ID(풀네임)
     item_type_combo="cmbMTYPN",        # 품목유형(필수 선택)
     item_type_value="ALL",             # ALL = 전체 유형 한번에
     item_type_index=0,                 # ALL = 드롭다운 1번째
@@ -42,7 +43,8 @@ STOCK = dict(
 )
 BOM = dict(
     title_re=r".*품목정보조회.*",       # frmPM10105Rv1
-    menu_path=["자원정의", "품목정의"],  # iEMenu 트리 경로
+    program_id="PM10105Rv1",           # F9 실행창에 입력할 프로그램 ID(풀네임)
+    menu_path=["자원정의", "품목정의"],  # iEMenu 트리 경로(F9 실패 시 폴백)
     menu_program="품목정보조회",         # 우측 목록에서 더블클릭할 프로그램
     mode_combo="cmbSELECT",            # 조회 모드 드롭다운
     mode_value="다단계전개",            # 다단계 BOM 전개
@@ -109,16 +111,48 @@ def open_via_menu(menu_path: list[str], program_name: str):
     time.sleep(2.0)
 
 
+def open_via_f9(program_id: str):
+    """iEMenu 메인창 포커스 상태에서 F9 → 화면 중앙에 뜨는 실행창에
+    프로그램 ID(풀네임)를 입력하고 Enter → 해당 화면을 바로 연다.
+    (기존 트리 '전체 펼치기' 탐색보다 빠르고 정확)."""
+    app = Application(backend=BACKEND).connect(title_re=r".*iEMenu.*", timeout=8)
+    menu = app.window(title_re=r".*iEMenu.*")
+    menu.set_focus()
+    time.sleep(0.3)
+    send_keys("{F9}")               # 실행창 팝업 (화면 중앙 작은 창)
+    time.sleep(0.8)                 # 팝업이 뜨고 입력 포커스가 잡힐 때까지 대기
+    # 팝업이 뜨면 입력칸에 포커스가 있으므로 그대로 타이핑 → Enter.
+    # 프로그램 ID에 특수문자 없다고 보고 그대로 전송(오타 방지 위해 기존값 지우고 입력).
+    send_keys("^a{DELETE}")         # 혹시 남은 값 전체선택 후 삭제
+    send_keys(program_id, with_spaces=True)
+    time.sleep(0.2)
+    send_keys("{ENTER}")
+    time.sleep(2.0)                 # 화면 로딩 대기
+
+
 def ensure_screen_open(cfg: dict):
-    """화면이 열려 있으면 그 창, 아니면 메뉴로 자동으로 열고 연결."""
+    """화면이 열려 있으면 그 창, 아니면 F9 실행창으로 자동으로 열고 연결.
+    (F9 실패 시 기존 트리 메뉴 탐색으로 폴백)."""
     win = _try_connect(cfg["title_re"])
     if win is not None:
         return win
+    # 1순위: F9 실행창에 프로그램 ID 입력
+    if cfg.get("program_id"):
+        print(f"   화면 자동 열기(F9): {cfg['program_id']}")
+        try:
+            open_via_f9(cfg["program_id"])
+            win = _try_connect(cfg["title_re"])
+            if win is not None:
+                return win
+            print("   F9 열기 실패 → 트리 메뉴 탐색으로 폴백")
+        except Exception as e:
+            print(f"   F9 열기 예외({type(e).__name__}) → 트리 메뉴 탐색으로 폴백")
+    # 2순위(폴백): iEMenu 트리 탐색
     if cfg.get("menu_path"):
         print(f"   화면 자동 열기: {' > '.join(cfg['menu_path'])} > {cfg['menu_program']}")
         open_via_menu(cfg["menu_path"], cfg["menu_program"])
         return connect_window(cfg["title_re"])
-    return connect_window(cfg["title_re"])  # 메뉴경로 없으면 기존 동작(안내 후 중단)
+    return connect_window(cfg["title_re"])  # 경로 없으면 기존 동작(안내 후 중단)
 
 
 def _click(win, title: str):

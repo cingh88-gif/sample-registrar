@@ -447,6 +447,7 @@ def lookup_first_in(codes, query_wait: float = 0.8, settle_timeout: float = 9.0,
 # 컨트롤 ID는 inspect_ierp.py "품질검사대상조회" 정찰로 확정함.
 RECEIPT_WIN = ("PM70111Uv2", "품질검사대상조회")
 RECEIPT_CFG = dict(
+    program_id="PM70111Uv2",  # F9 실행창에 입력할 프로그램 ID(풀네임)
     part_combo="cmbRPINSM",   # 검사파트 콤보
     part_value="자재파트",     # 검사파트 = 자재파트
     date_from="dtpFRDATE",    # 입고일자 시작 (DateTimePicker)
@@ -567,6 +568,18 @@ def ensure_qc_open():
         raise SystemExit("품질검사대상조회 창이 없습니다 → iERP에서 직접 띄워주세요.")
     tree_nodes = list(RECEIPT_CFG.get("menu_path") or ["품질관리"])
     program = RECEIPT_CFG.get("menu_program") or "품질검사대상조회"
+    program_id = RECEIPT_CFG.get("program_id")
+    # 1순위: F9 실행창에 프로그램 ID 입력(빠르고 정확)
+    if program_id and hasattr(ie, "open_via_f9"):
+        print(f"  품질검사대상조회 자동 열기(F9): {program_id}")
+        try:
+            ie.open_via_f9(program_id)
+            return _find_window(RECEIPT_WIN, "품질검사대상조회")
+        except SystemExit:
+            print("  F9 열기 실패 → 트리 메뉴 탐색으로 폴백")
+        except Exception as e:
+            print(f"  F9 열기 예외({type(e).__name__}) → 트리 메뉴 탐색으로 폴백")
+    # 2순위(폴백): iEMenu '전체 펼치기' 트리 탐색
     print(f"  품질검사대상조회 자동 열기: 전체펼치기 → {' → '.join(tree_nodes)}(트리) → {program}(목록) 더블클릭")
     try:
         _open_via_expand_all(tree_nodes, program)
